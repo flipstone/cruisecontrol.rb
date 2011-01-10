@@ -10,7 +10,7 @@ namespace :deploy do
   end
   
   task :start, :roles => :app do
-    run "cd #{current_path} && bundle exec unicorn --daemonize -E #{rails_env} -c #{shared_path}/system/unicorn.conf"
+    run "cd #{current_path} && bundle exec unicorn_rails --daemonize -E #{rails_env} -c #{shared_path}/system/unicorn.conf"
   end
 
   task :stop, :roles => :app do

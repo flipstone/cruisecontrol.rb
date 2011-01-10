@@ -27,6 +27,7 @@ task :prepare_new_box do
   deploy.unicorn_config
   nginx.config
   nginx.site_enable
+  nginx.reload
 end
 
 task :sanity_check do
