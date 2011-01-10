@@ -36,5 +36,6 @@ DEPENDENCIES
   mocha
   oauth
   rack (= 1.0.1)
+  rake (= 0.8.7)
   unicorn (= 2.0.0)
   xml-simple
