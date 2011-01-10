@@ -58,7 +58,7 @@ default_run_options[:pty] = true
 
 set :unicorn, {
   port: 8080,
-  worker_processes: 4,
+  worker_processes: 1,
   worker_timeout: 15, #in seconds
   preload_app: false
 }

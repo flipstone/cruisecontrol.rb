@@ -1,5 +1,7 @@
 source 'http://rubygems.org'
 
+gem 'rake', '0.8.7'
+
 gem 'rack', '1.0.1'
 gem 'oauth'
 gem 'hashie', '0.1.3'

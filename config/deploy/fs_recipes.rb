@@ -17,12 +17,20 @@ task :install_deploy_keys, :roles => :app do
   run "export GIT_SSH=#{wrapper_path}"
 end
 
+desc "pushes the fs-buildserver account-level key to ubuntu user"
+task :install_flipstone_key, :roles => :app do
+  fs_key_path = "/home/ubuntu/.ssh/id_rsa"
+  top.upload("#{ENV['HOME']}/.ssh/fs-buildserver", fs_key_path, :via => :scp)
+  run "chmod 400 #{fs_key_path}"
+end
+
 desc <<-DESC
   Prepare a freshly launched machine for doing a full deployment.  If the environment runs its own
   DB server, the appropriate database will need to be created manually as well.
 DESC
 task :prepare_new_box do
   deploy.setup
+  install_flipstone_key
   deploy.update
   deploy.unicorn_config
   nginx.config
