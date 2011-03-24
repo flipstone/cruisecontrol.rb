@@ -9,4 +9,6 @@ gem 'unicorn', '2.0.0'
 gem 'xml-simple'
 gem 'mocha'
 
-gem 'capistrano'
+# Deploy with Capistrano
+gem 'capistrano', '~> 2.5'
+gem 'flipstone-deployment', git: 'git://github.com/flipstone/flipstone-deployment.git', branch: '1f75e3084f980cbddc4ab51906f51cc7bfee73b1'

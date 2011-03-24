@@ -1,3 +1,10 @@
+GIT
+  remote: git://github.com/flipstone/flipstone-deployment.git
+  revision: 1f75e3084f980cbddc4ab51906f51cc7bfee73b1
+  branch: 1f75e3084f980cbddc4ab51906f51cc7bfee73b1
+  specs:
+    flipstone-deployment (0.0.1)
+
 GEM
   remote: http://rubygems.org/
   specs:
@@ -31,7 +38,8 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
-  capistrano
+  capistrano (~> 2.5)
+  flipstone-deployment!
   hashie (= 0.1.3)
   mocha
   oauth
