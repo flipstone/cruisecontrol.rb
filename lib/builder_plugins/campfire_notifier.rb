@@ -12,7 +12,7 @@ class CampfireNotifier < BuilderPlugin
     notify build
   end
 
-  def room(room_number)
+  def room=(room_number)
     @rooms << room_number
   end
 
