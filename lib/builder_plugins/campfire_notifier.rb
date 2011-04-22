@@ -112,4 +112,4 @@ class CampfireNotifier < BuilderPlugin
 
 end
 
-Project.plugin :campfire_emailer
+Project.plugin :campfire_notifier
