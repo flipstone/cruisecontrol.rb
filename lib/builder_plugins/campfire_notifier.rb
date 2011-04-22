@@ -12,17 +12,23 @@ class CampfireNotifier < BuilderPlugin
     notify build
   end
 
+  def room(room_number)
+    @rooms << room_number
+  end
+
   def notify(build)
-    room = Campfire.room(376503)
-    room.join
-    room.lock
+    @rooms.each  do |roomnumber|
+      room = Campfire.room(roomnumber)
+      room.join
+      room.lock
         
-    room.message 'Cruise build finished:'
-    room.paste "BUILD #{build.status}"
-    room.play_sound 'rimshot'
+      room.message 'Cruise build finished:'
+      room.paste "BUILD #{build.status}"
+      room.play_sound 'rimshot'
     
-    room.unlock
-    room.leave
+      room.unlock
+      room.leave
+    end
   end
 
   # from http://developer.37signals.com/campfire/
