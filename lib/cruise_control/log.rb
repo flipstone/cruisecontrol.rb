@@ -11,7 +11,7 @@ module CruiseControl
     end
   
     def self.event(description, severity = :info)
-      return if severity == :debug and not @verbose
+      # return if severity == :debug and not @verbose
       message = "[#{Time.now.strftime('%Y-%m-%d %H:%M:%S')}] #{description}"
       Log.send(severity.to_sym, message)
     end

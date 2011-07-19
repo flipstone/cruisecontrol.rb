@@ -11,15 +11,15 @@ begin
   require 'rubygems'
   gem 'httparty','~>0.4.3'
 rescue
-  CruiseControl::Log.fatal("Requires httparty gem ~>0.4.5, =0.4.5 and =5.0.0 don't work")
+  CruiseControl::Log.event("Requires httparty gem ~>0.4.5, =0.4.5 and =5.0.0 don't work", :fatal)
   exit
 end
 
 begin
   require 'tinder'
 rescue LoadError
-  CruiseControl::Log.fatal("Campfire notifier: Unable to load 'tinder' gem.")
-  CruiseControl::Log.fatal("Install the tinder gem with: sudo gem install tinder")
+  CruiseControl::Log.event("Campfire notifier: Unable to load 'tinder' gem.", :fatal)
+  CruiseControl::Log.event("Install the tinder gem with: sudo gem install tinder", :fatal)
   exit
 end
 
@@ -31,18 +31,18 @@ class CampfireNotifier < BuilderPlugin
 
   def connect
     unless @subdomain
-      CruiseControl::Log.warn("Failed to load Campfire notifier plugin settings.  See the README in the plugin for instructions.")
+      CruiseControl::Log.event("Failed to load Campfire notifier plugin settings.  See the README in the plugin for instructions.", :warn)
       return false
     end
-    CruiseControl::Log.debug("Campfire notifier: connecting to #{@subdomain}")
+    CruiseControl::Log.event("Campfire notifier: connecting to #{@subdomain}", :debug)
     @campfire = Tinder::Campfire.new(@subdomain, token: @token)
 
-    CruiseControl::Log.debug("Campfire notifier: finding room: #{@room}")
+    CruiseControl::Log.event("Campfire notifier: finding room: #{@room}", :debug)
     @chat_room = @campfire.find_room_by_name(@room)
   end
 
   def disconnect
-    CruiseControl::Log.debug("Campfire notifier: disconnecting from #{@subdomain}")
+    CruiseControl::Log.event("Campfire notifier: disconnecting from #{@subdomain}", :debug)
     @campfire.logout if defined?(@campfire) && @campfire.logged_in?
   end
 
@@ -56,7 +56,7 @@ class CampfireNotifier < BuilderPlugin
   end
 
   def build_finished(build)
-    notify(build) if build.failed?
+    notify(build) # if build.failed?
   end
 
   def build_fixed(fixed_build, previous_build)
@@ -77,14 +77,14 @@ class CampfireNotifier < BuilderPlugin
 
     if connect
       begin
-        CruiseControl::Log.debug("Campfire notifier: sending notice: '#{message}'")
+        CruiseControl::Log.event("Campfire notifier: sending notice: '#{message}'", :info)
         @chat_room.speak(message)
         @chat_room.paste("#{message}\n#{build.changeset}")
       ensure
         disconnect rescue nil
       end
     else
-      CruiseControl::Log.warn("Campfire notifier: couldn't connect to send notice: '#{message}'")
+      CruiseControl::Log.event("Campfire notifier: couldn't connect to send notice: '#{message}'" :warn)
     end
   end
 end
