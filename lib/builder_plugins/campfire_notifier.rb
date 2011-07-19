@@ -1,3 +1,12 @@
+#
+# Add the following to your individual project cruise_config.rb
+# 
+# project.campfire_notifier.subdomain = 'flipstone'
+# project.campfire_notifier.token = 'xxxxasdfasdfas23412346'
+# project.campfire_notifier.room = 'Chat Room'
+#
+#
+
 begin
   require 'rubygems'
   gem 'httparty','~>0.4.3'
@@ -26,7 +35,7 @@ class CampfireNotifier < BuilderPlugin
       return false
     end
     CruiseControl::Log.debug("Campfire notifier: connecting to #{@subdomain}")
-    @campfire = Tinder::Campfire.new(@subdomain, @token)
+    @campfire = Tinder::Campfire.new(@subdomain, token: @token)
 
     CruiseControl::Log.debug("Campfire notifier: finding room: #{@room}")
     @chat_room = @campfire.find_room_by_name(@room)
