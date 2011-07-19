@@ -35,7 +35,7 @@ class CampfireNotifier < BuilderPlugin
       return false
     end
     CruiseControl::Log.event("Campfire notifier: connecting to #{@subdomain}", :debug)
-    @campfire = Tinder::Campfire.new(@subdomain, token: @token)
+    @campfire = Tinder::Campfire.new(@subdomain, token => @token)
 
     CruiseControl::Log.event("Campfire notifier: finding room: #{@room}", :debug)
     @chat_room = @campfire.find_room_by_name(@room)
@@ -84,7 +84,7 @@ class CampfireNotifier < BuilderPlugin
         disconnect rescue nil
       end
     else
-      CruiseControl::Log.event("Campfire notifier: couldn't connect to send notice: '#{message}'" :warn)
+      CruiseControl::Log.event("Campfire notifier: couldn't connect to send notice: '#{message}'", :warn)
     end
   end
 end
