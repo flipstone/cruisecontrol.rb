@@ -1,88 +1,90 @@
-require 'tinder'
-
-class CampfireNotifier
-  VERSION = 0.2
-  attr_accessor :room_name, :settings_scope
-
-  def initialize(project = nil)
-    @project = project
-  end
-
-  def self.settings
-    YAML.load_file(File.join(RAILS_ROOT, "config", "campfire_notifier.yml")) rescue nil
-  end
-  
-  def settings
-    CampfireNotifier.settings[settings_scope]
-    logger.debug("Campfire Notifier using settings #{settings_scope}")
-  end
-  
-  def room
-    self.room_name ||= settings["room"]
-    return if room_name.nil?
-    logger.debug("Campfire Notifier configured with #{settings.inspect}")
-    campfire = Tinder::Campfire.new(settings["subdomain"], :ssl => settings["use_ssl"])
-    campfire.login settings["login"], settings["password"]
-    logger.debug("Logged in to campfire #{settings['subdomain']} as #{settings['login']}")
-    campfire.find_room_by_name(room_name)
-  rescue => e
-    logger.error("Trouble initalizing campfire room #{room_name}")
-    raise
-  end
-  
-  def build_finished(build)
-    clear_flag
-    build_text = "Build #{build.label}"
-    speak(build.failed? ? "#{build_text} broken" : "#{build_text} successful")
-  end
-
-  def build_fixed(build, previous_build=nil)
-    clear_flag
-    speak("Build fixed in #{build.label}")
-  end
-  
-  def build_loop_failed(error)
-    return if flagged? && is_subversion_down?(error)
-    if is_subversion_down?(error)
-      speak "Build loop failed: Error connecting to Subversion"
-      set_flag
-    else
-      speak( "Build loop failed with: #{error.class}: #{error.message}")
-      error.backtrace.each { |line| speak line } rescue nil
-    end
-  end
-
-  def speak(message)
-    room.speak(message) unless room_name.nil?
-  rescue => e
-    logger.error("Error speaking into campfire room #{room_name}")
-    raise
-  end
-  
-  def logger
-    CruiseControl::Log
-  end
-  
-  def flagged?
-    File.exists?("#{@project.name}.svn_flag")
-  end
-    
-  def set_flag
-    File.open("#{@project.name}.svn_flag","w") do |file|
-      file.puts "#{@project.name} subversion down"
-    end
-  end
-  
-  def clear_flag
-    return unless flagged?
-    File.delete("#{@project.name}.svn_flag")
-    speak "Subversion is back"
-  end
-    
-  def is_subversion_down?(error)
-    /svn: PROPFIND request failed/.match(error.message)
-  end
-
+begin
+  require 'rubygems'
+  gem 'httparty','~>0.4.3'
+rescue
+  CruiseControl::Log.fatal("Requires httparty gem ~>0.4.5, =0.4.5 and =5.0.0 don't work")
+  exit
 end
 
-Project.plugin :campfire_notifier unless CampfireNotifier.settings.nil?
+begin
+  require 'tinder'
+rescue LoadError
+  CruiseControl::Log.fatal("Campfire notifier: Unable to load 'tinder' gem.")
+  CruiseControl::Log.fatal("Install the tinder gem with: sudo gem install tinder")
+  exit
+end
+
+class CampfireNotifier < BuilderPlugin
+  attr_accessor :subdomain, :room, :username, :password, :campfire
+
+  def initialize(project = nil)
+  end
+
+  def connect
+    unless @subdomain
+      CruiseControl::Log.warn("Failed to load Campfire notifier plugin settings.  See the README in the plugin for instructions.")
+      return false
+    end
+    CruiseControl::Log.debug("Campfire notifier: connecting to #{@subdomain}")
+    @campfire = Tinder::Campfire.new(@subdomain)
+    CruiseControl::Log.debug("Campfire notifier: authenticating user: #{@username}")
+    begin
+      @campfire.login(@username, @password)
+    rescue Tinder::Error
+      CruiseControl::Log.warn("Campfire notifier: login failed, unable to notify")
+      return false
+    end
+
+    CruiseControl::Log.debug("Campfire notifier: finding room: #{@room}")
+    @chat_room = @campfire.find_room_by_name(@room)
+  end
+
+  def disconnect
+    CruiseControl::Log.debug("Campfire notifier: disconnecting from #{@subdomain}")
+    @campfire.logout if defined?(@campfire) && @campfire.logged_in?
+  end
+
+  def reconnect
+    disconnect
+    connect
+  end
+
+  def connected?
+    defined?(@campfire) && @campfire.logged_in?
+  end
+
+  def build_finished(build)
+    notify(build) if build.failed?
+  end
+
+  def build_fixed(fixed_build, previous_build)
+    notify(fixed_build)
+  end
+
+  def notification_message(build)
+    status = build.failed? ? "broken" : "fixed"
+    message = "CI build #{build.project.name} #{status.upcase}: "
+    if Configuration.dashboard_url
+      message += "#{build.url}"
+    end
+    message
+  end
+
+  def notify(build)
+    message = notification_message(build)
+
+    if connect
+      begin
+        CruiseControl::Log.debug("Campfire notifier: sending notice: '#{message}'")
+        @chat_room.speak(message)
+        @chat_room.paste("#{message}\n#{build.changeset}")
+      ensure
+        disconnect rescue nil
+      end
+    else
+      CruiseControl::Log.warn("Campfire notifier: couldn't connect to send notice: '#{message}'")
+    end
+  end
+end
+
+Project.plugin :campfire_notifier
