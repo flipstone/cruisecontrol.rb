@@ -13,7 +13,7 @@ class CampfireNotifier
   end
   
   def settings
-    scope = @settings_scope || default
+    scope = @settings_scope || :default
     CampfireNotifier.settings[scope]
   end
   

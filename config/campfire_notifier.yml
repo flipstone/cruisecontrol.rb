@@ -5,9 +5,16 @@ finario:
   password: welcome1
   room: Chat Room
 
-default:
+sunmath:
   subdomain: flipstone
   use_ssl: true
   login: flipstone
   password: welcome1
   room: Sunmath
+
+default:
+  subdomain: flipstone
+  use_ssl: true
+  login: flipstone
+  password: welcome1
+  room: Flipstone
