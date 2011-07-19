@@ -20,6 +20,11 @@ task :production do
   set :rails_env, "production"
   set :instance, "cruise.flipstone.com"
   set :unicorn_port, 8080
+  set :nginx_cfg, {
+    port: 80,
+    ht_user: "cruise",
+    ht_passwd: "welcome1"
+  }
   set_env
 end
 

@@ -1,115 +1,88 @@
-require 'httparty'
-require 'json'
+require 'tinder'
 
-class CampfireNotifier < BuilderPlugin
+class CampfireNotifier
+  VERSION = 0.2
+  attr_accessor :room_name, :settings_scope
 
   def initialize(project = nil)
-    @rooms = []
+    @project = project
   end
 
+  def self.settings
+    YAML.load_file(File.join(RAILS_ROOT, "config", "campfire_notifier.yml")) rescue nil
+  end
+  
+  def settings
+    scope = @settings_scope || default
+    CampfireNotifier.settings[scope]
+  end
+  
+  def room
+    self.room_name ||= settings["room"]
+    return if room_name.nil?
+    logger.debug("Campfire Notifier configured with #{settings.inspect}")
+    campfire = Tinder::Campfire.new(settings["subdomain"], :ssl => settings["use_ssl"])
+    campfire.login settings["login"], settings["password"]
+    logger.debug("Logged in to campfire #{settings['subdomain']} as #{settings['login']}")
+    campfire.find_room_by_name(room_name)
+  rescue => e
+    logger.error("Trouble initalizing campfire room #{room_name}")
+    raise
+  end
+  
   def build_finished(build)
-    return if @rooms.empty?
-    notify build
+    clear_flag
+    build_text = "Build #{build.label}"
+    speak(build.failed? ? "#{build_text} broken" : "#{build_text} successful")
   end
 
-  def room=(room_number)
-    @rooms << room_number
+  def build_fixed(build, previous_build=nil)
+    clear_flag
+    speak("Build fixed in #{build.label}")
+  end
+  
+  def build_loop_failed(error)
+    return if flagged? && is_subversion_down?(error)
+    if is_subversion_down?(error)
+      speak "Build loop failed: Error connecting to Subversion"
+      set_flag
+    else
+      speak( "Build loop failed with: #{error.class}: #{error.message}")
+      error.backtrace.each { |line| speak line } rescue nil
+    end
   end
 
-  def notify(build)
-    @rooms.each  do |roomnumber|
-      room = Campfire.room(roomnumber)
-      room.join
-      room.lock
-        
-      room.message 'Cruise build finished:'
-      room.paste "BUILD #{build.status}"
-      room.play_sound 'rimshot'
+  def speak(message)
+    room.speak(message) unless room_name.nil?
+  rescue => e
+    logger.error("Error speaking into campfire room #{room_name}")
+    raise
+  end
+  
+  def logger
+    CruiseControl::Log
+  end
+  
+  def flagged?
+    File.exists?("#{@project.name}.svn_flag")
+  end
     
-      room.unlock
-      room.leave
+  def set_flag
+    File.open("#{@project.name}.svn_flag","w") do |file|
+      file.puts "#{@project.name} subversion down"
     end
   end
-
-  # from http://developer.37signals.com/campfire/
-  class Campfire
-    include HTTParty
-
-    base_uri   'https://37s.campfirenow.com'
-    basic_auth '73d3108ab61da924ac3407d6b4169a13877d10e9', 'x'
-    headers    'Content-Type' => 'application/json'
-
-    def self.rooms
-      Campfire.get('/rooms.json')["rooms"]
-    end
-
-    def self.room(room_id)
-      Room.new(room_id)
-    end
-
-    def self.user(id)
-      Campfire.get("/users/#{id}.json")["user"]
-    end
+  
+  def clear_flag
+    return unless flagged?
+    File.delete("#{@project.name}.svn_flag")
+    speak "Subversion is back"
   end
-
-  class Room
-    attr_reader :room_id
-
-    def initialize(room_id)
-      @room_id = room_id
-    end
-
-    def join
-      post 'join'
-    end
-
-    def leave
-      post 'leave'
-    end
-
-    def lock
-      post 'lock'
-    end
-
-    def unlock
-      post 'unlock'
-    end
-
-    def message(message)
-      send_message message
-    end
-
-    def paste(paste)
-      send_message paste, 'PasteMessage'
-    end
-
-    def play_sound(sound)
-      send_message sound, 'SoundMessage'
-    end
-
-    def transcript
-      get('transcript')['messages']
-    end
-
-    private
-
-    def send_message(message, type = 'Textmessage')
-      post 'speak', :body => {:message => {:body => message, :type => type}}.to_json
-    end
-
-    def get(action, options = {})
-      Campfire.get room_url_for(action), options
-    end
-
-    def post(action, options = {})
-      Campfire.post room_url_for(action), options
-    end
-
-    def room_url_for(action)
-      "/room/#{room_id}/#{action}.json"
-    end
+    
+  def is_subversion_down?(error)
+    /svn: PROPFIND request failed/.match(error.message)
   end
 
 end
 
-Project.plugin :campfire_notifier
+Project.plugin :campfire_notifier unless CampfireNotifier.settings.nil?
