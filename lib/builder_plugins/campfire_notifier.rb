@@ -14,6 +14,7 @@ class CampfireNotifier
   
   def settings
     CampfireNotifier.settings[settings_scope]
+    logger.debug("Campfire Notifier using settings #{settings_scope}")
   end
   
   def room
