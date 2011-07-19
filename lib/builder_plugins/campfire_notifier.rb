@@ -13,8 +13,7 @@ class CampfireNotifier
   end
   
   def settings
-    scope = @settings_scope || :default
-    CampfireNotifier.settings[scope]
+    CampfireNotifier.settings[settings_scope]
   end
   
   def room

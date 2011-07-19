@@ -1,20 +1,13 @@
 finario:
   subdomain: finarioapp
-  use_ssl: true
+  use_ssl: false
   login: finariobot
   password: welcome1
   room: Chat Room
 
 sunmath:
   subdomain: flipstone
-  use_ssl: true
+  use_ssl: false
   login: flipstone
   password: welcome1
   room: Sunmath
-
-default:
-  subdomain: flipstone
-  use_ssl: true
-  login: flipstone
-  password: welcome1
-  room: Flipstone
