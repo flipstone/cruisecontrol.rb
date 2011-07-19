@@ -15,7 +15,7 @@ rescue LoadError
 end
 
 class CampfireNotifier < BuilderPlugin
-  attr_accessor :subdomain, :room, :username, :password, :campfire
+  attr_accessor :subdomain, :room, :token, :campfire
 
   def initialize(project = nil)
   end
@@ -26,14 +26,7 @@ class CampfireNotifier < BuilderPlugin
       return false
     end
     CruiseControl::Log.debug("Campfire notifier: connecting to #{@subdomain}")
-    @campfire = Tinder::Campfire.new(@subdomain)
-    CruiseControl::Log.debug("Campfire notifier: authenticating user: #{@username}")
-    begin
-      @campfire.login(@username, @password)
-    rescue Tinder::Error
-      CruiseControl::Log.warn("Campfire notifier: login failed, unable to notify")
-      return false
-    end
+    @campfire = Tinder::Campfire.new(@subdomain, @token)
 
     CruiseControl::Log.debug("Campfire notifier: finding room: #{@room}")
     @chat_room = @campfire.find_room_by_name(@room)
@@ -63,7 +56,7 @@ class CampfireNotifier < BuilderPlugin
 
   def notification_message(build)
     status = build.failed? ? "broken" : "fixed"
-    message = "CI build #{build.project.name} #{status.upcase}: "
+    message = "Cruise build #{build.project.name} #{status.upcase}: "
     if Configuration.dashboard_url
       message += "#{build.url}"
     end
