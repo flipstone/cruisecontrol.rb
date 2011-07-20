@@ -58,7 +58,3 @@ task :set_env do
   }
 
 end
-
-set :nginx_cfg, {
-  port: 80
-}
