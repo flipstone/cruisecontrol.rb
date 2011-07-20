@@ -35,7 +35,7 @@ class CampfireNotifier < BuilderPlugin
       return false
     end
     CruiseControl::Log.event("Campfire notifier: connecting to #{@subdomain}", :debug)
-    @campfire = Tinder::Campfire.new(@subdomain, token => @token)
+    @campfire = Tinder::Campfire.new(@subdomain, token: @token)
 
     CruiseControl::Log.event("Campfire notifier: finding room: #{@room}", :debug)
     @chat_room = @campfire.find_room_by_name(@room)
@@ -65,7 +65,10 @@ class CampfireNotifier < BuilderPlugin
 
   def notification_message(build)
     status = build.failed? ? "broken" : "fixed"
-    committers_list = committers(revisions_in_build(build))
+
+    changeset = build.changeset
+    parsedset = SourceControl::Subversion::ChangesetLogParser.new.parse_log changeset.split("\n")
+    committers_list = committers(parsedset)
 
     message = "Build #{build.project.name} #{status.upcase} (#{committers_list}): "
     if Configuration.dashboard_url
