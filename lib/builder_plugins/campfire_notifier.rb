@@ -64,12 +64,12 @@ class CampfireNotifier < BuilderPlugin
   end
 
   def notification_message(build, status)
-    statustext = status || (build.failed? ? "broken" : "OK")
+    statustext = status || (build.failed? ? "broken" : "passed")
     committer = build.project.source_control.latest_revision.author
     mailmatched = /(.*) +(<.*\@.*)/.match committer
     committer_name = (mailmatched ? mailmatched[1] : committer)
-    message = "[Build #{build.project.name}] #{statustext.upcase} - #{committer_name})"
-    if Configuration.dashboard_url && build.failed?
+    message = "[Build #{build.project.name}] #{statustext.upcase} - #{committer_name}"
+    if Configuration.dashboard_url
       message += " : #{build.url}"
     end
     message
