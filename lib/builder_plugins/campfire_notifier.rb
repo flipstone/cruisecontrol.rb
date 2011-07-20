@@ -60,25 +60,24 @@ class CampfireNotifier < BuilderPlugin
   end
 
   def build_fixed(fixed_build, previous_build)
-    notify(fixed_build)
+    notify(fixed_build, "fixed")
   end
 
-  def notification_message(build)
-    status = build.failed? ? "broken" : "fixed"
-
-    changeset = build.changeset
-    parsedset = SourceControl::Subversion::ChangesetLogParser.new.parse_log changeset.split("\n")
-    committers_list = committers(parsedset)
-
-    message = "Build #{build.project.name} #{status.upcase} (#{committers_list}): "
-    if Configuration.dashboard_url
-      message += "#{build.url}"
+  def notification_message(build, status)
+    statustext = status || (build.failed? ? "broken" : "OK")
+    committer = build.project.source_control.latest_revision.author
+    mailmatched = /(.*) +(<.*\@.*)/.match committer
+    committer_name = (mailmatched ? mailmatched[1] : committer)
+    message = "Build #{build.project.name} #{statustext.upcase} - #{committer_name})"
+    if Configuration.dashboard_url && build_failed?
+      message += " : #{build.url}"
     end
     message
   end
 
-  def notify(build)
-    message = notification_message(build)
+
+  def notify(build, status=nil)
+    message = notification_message(build, status)
 
     if connect
       begin
@@ -92,15 +91,6 @@ class CampfireNotifier < BuilderPlugin
     end
   end
 
-  def committers(revisions)
-    return '' if revisions.empty?    
-    if revisions.length == 1
-      revision = revisions[0]
-      revision.author
-    else
-      revisions.collect { |rev| rev.author }.uniq
-    end
-  end
 end
 
 Project.plugin :campfire_notifier
