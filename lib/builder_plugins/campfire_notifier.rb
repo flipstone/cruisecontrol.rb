@@ -69,7 +69,7 @@ class CampfireNotifier < BuilderPlugin
     mailmatched = /(.*) +(<.*\@.*)/.match committer
     committer_name = (mailmatched ? mailmatched[1] : committer)
     message = "[Build #{build.project.name}] #{statustext.upcase} - #{committer_name})"
-    if Configuration.dashboard_url && build_failed?
+    if Configuration.dashboard_url && build.failed?
       message += " : #{build.url}"
     end
     message
