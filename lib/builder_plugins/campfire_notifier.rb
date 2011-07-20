@@ -65,10 +65,9 @@ class CampfireNotifier < BuilderPlugin
 
   def notification_message(build)
     status = build.failed? ? "broken" : "fixed"
-    
-    text = show_revisions_in_build(revisions_in_build(build))
-    
-    message = "Build #{build.project.name} #{status.upcase} (#{committers}): "
+    committers_list = committers(revisions_in_build(build))
+
+    message = "Build #{build.project.name} #{status.upcase} (#{committers_list}): "
     if Configuration.dashboard_url
       message += "#{build.url}"
     end
