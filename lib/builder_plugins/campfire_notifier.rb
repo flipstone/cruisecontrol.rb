@@ -56,7 +56,7 @@ class CampfireNotifier < BuilderPlugin
   end
 
   def build_finished(build)
-    notify(build) # if build.failed?
+    notify(build)
   end
 
   def build_fixed(fixed_build, previous_build)
@@ -65,7 +65,10 @@ class CampfireNotifier < BuilderPlugin
 
   def notification_message(build)
     status = build.failed? ? "broken" : "fixed"
-    message = "Cruise build #{build.project.name} #{status.upcase}: "
+    
+    text = show_revisions_in_build(revisions_in_build(latest_build))
+    
+    message = "Build #{build.project.name} #{status.upcase} (#{committers}): "
     if Configuration.dashboard_url
       message += "#{build.url}"
     end
@@ -79,12 +82,21 @@ class CampfireNotifier < BuilderPlugin
       begin
         CruiseControl::Log.event("Campfire notifier: sending notice: '#{message}'", :info)
         @chat_room.speak(message)
-        @chat_room.paste("#{message}\n#{build.changeset}")
       ensure
         disconnect rescue nil
       end
     else
       CruiseControl::Log.event("Campfire notifier: couldn't connect to send notice: '#{message}'", :warn)
+    end
+  end
+
+  def committers(revisions)
+    return '' if revisions.empty?    
+    if revisions.length == 1
+      revision = revisions[0]
+      revision.author
+    else
+      revisions.collect { |rev| rev.author }.uniq
     end
   end
 end
