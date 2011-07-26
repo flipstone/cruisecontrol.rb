@@ -58,7 +58,7 @@ DEPENDENCIES
   capistrano (~> 2.5)
   flipstone-deployment!
   hashie (= 0.1.3)
-  httparty
+  httparty (= 0.7.8)
   mocha
   oauth
   rack (= 1.0.1)

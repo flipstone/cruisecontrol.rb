@@ -9,7 +9,7 @@
 
 begin
   require 'rubygems'
-  gem 'httparty','~>0.4.3'
+  gem 'httparty'
 rescue
   CruiseControl::Log.event("Requires httparty gem ~>0.4.5, =0.4.5 and =5.0.0 don't work", :fatal)
   exit
