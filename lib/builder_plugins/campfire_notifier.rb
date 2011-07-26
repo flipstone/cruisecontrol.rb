@@ -68,7 +68,14 @@ class CampfireNotifier < BuilderPlugin
     committer = build.project.source_control.latest_revision.author
     mailmatched = /(.*) +(<.*\@.*)/.match committer
     committer_name = (mailmatched ? mailmatched[1] : committer)
-    message = "[Build #{build.project.name}] (#{build.elapsed_time}) #{statustext.upcase} - #{committer_name}"
+    etime = ""
+    begin 
+      total_seconds = build.elapsed_time
+      etime = "(#{DurationFormatter.new(total_seconds).send(:general)}) "
+    rescue
+    end
+    
+    message = "[Build #{build.project.name}] #{etime}#{statustext.upcase} - #{committer_name}"
     if Configuration.dashboard_url
       message += " : #{build.url}"
     end
