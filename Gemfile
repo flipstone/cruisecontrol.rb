@@ -8,7 +8,7 @@ gem 'hashie', '0.1.3'
 gem 'unicorn', '2.0.0'
 gem 'xml-simple'
 gem 'mocha'
-gem 'httparty'
+gem 'httparty', '0.7.8'
 gem 'tinder'
 
 # Deploy with Capistrano
