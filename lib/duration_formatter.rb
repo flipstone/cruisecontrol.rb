@@ -11,9 +11,9 @@ class DurationFormatter
     elsif @hours >= 1
       "#{@hours} #{hours_label} #{@minutes} #{minutes_label}"
     elsif @minutes >= 1
-      "#{@minutes} #{minutes_label}"
+      "#{@minutes}#{minutes_label}"
     else
-      "#{@seconds} #{seconds_label}"
+      "#{@seconds}#{seconds_label}"
     end
   end
 
@@ -30,11 +30,11 @@ class DurationFormatter
   end
 
   def minutes_label
-    @minutes == 1 ? 'minute' : 'minutes'
+    'm'
   end
 
   def seconds_label
-    @seconds == 1 ? 'second' : 'seconds'
+    's'
   end
 
   def method_missing(format, *args)
