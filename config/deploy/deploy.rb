@@ -55,7 +55,8 @@ task :set_env do
     port: unicorn_port,
     worker_processes: 2,
     worker_timeout: 15, #in seconds
-    preload_app: false
+    preload_app: false,
+    process: "unicorn_rails"
   }
 
 end

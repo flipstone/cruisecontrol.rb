@@ -1,7 +1,7 @@
 GIT
   remote: git://github.com/flipstone/flipstone-deployment.git
-  revision: 3e13247c58a9cab7229011d673309e230e78417d
-  branch: 3e13247
+  revision: fc71e69ad6bc9e0cce25e6209d7220f8e9ff02d5
+  branch: fc71e69
   specs:
     flipstone-deployment (0.0.1)
 

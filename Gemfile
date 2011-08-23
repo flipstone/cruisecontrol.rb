@@ -13,4 +13,4 @@ gem 'tinder'
 
 # Deploy with Capistrano
 gem 'capistrano', '~> 2.5'
-gem 'flipstone-deployment', git: 'git://github.com/flipstone/flipstone-deployment.git', branch: '3e13247'
+gem 'flipstone-deployment', git: 'git://github.com/flipstone/flipstone-deployment.git', branch: 'fc71e69'
