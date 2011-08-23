@@ -11,6 +11,7 @@ require "flipstone-deployment/capistrano"
 set :instance, "localhost" 
 set :branch, "master" 
 set :deployment_safeword, "easypeasy"
+set :rvm_ruby_string, '1.9.2'
 
 #
 # environment settings (by task)
