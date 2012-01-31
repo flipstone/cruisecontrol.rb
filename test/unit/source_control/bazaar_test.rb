@@ -1,4 +1,4 @@
-require File.dirname(__FILE__) + '/../../test_helper'
+require 'test_helper'
 
 module SourceControl
   class BazaarTest < Test::Unit::TestCase
@@ -50,6 +50,15 @@ module SourceControl
         bazaar_with_checkout_data.expects(:bzr).with(
             'branch', ['/tmp/bzr_repo', '.'], :execute_in_project_directory => false)
         assert_nothing_raised { bazaar_with_checkout_data.checkout }
+      end
+    end
+
+    def test_checkout_to_a_given_directory
+      bzr = Bazaar.new(:repository => '/tmp/bzr_repo')
+      in_sandbox do |sandbox|
+        bzr.expects(:bzr).with('branch', ['/tmp/bzr_repo', 'somewhere'], :execute_in_project_directory => false)
+        FileUtils.mkdir File.join(sandbox.root, "somewhere")
+        assert_nothing_raised { bzr.checkout(nil, $stdout, 'somewhere') }
       end
     end
 

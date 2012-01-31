@@ -1,7 +1,7 @@
 class DocumentationController < ApplicationController
   caches_page :get
 
-  # TODO Fix this. Fix it hard.
+  # TODO Fix this. Fix it hard. - SHOULD BE CONVERTED TO STATIC DOCUMENTATION.
   def get
     if params[:path].blank?
       render :template => "documentation/index", :layout => "documentation"
@@ -17,9 +17,9 @@ class DocumentationController < ApplicationController
       @plugin_title = ActiveSupport::Inflector.titleize(params[:name].sub(/\.rb$/, ''))
       case params[:type]
       when 'builtin'
-        @file = File.join(RAILS_ROOT, 'lib', 'builder_plugins', params[:name])
+        @file = Rails.root.join('lib', 'builder_plugins', params[:name])
       when 'installed'
-        @file = File.join(CRUISE_DATA_ROOT, 'builder_plugins', params[:name])
+        @file = Configuration.plugins_root.join(params[:name])
       when 'available'
         #???
       end

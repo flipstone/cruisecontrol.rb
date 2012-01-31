@@ -20,7 +20,7 @@ module SourceControl
         Revision.new(hash['revision'].to_i, hash['author'], date, message, changesets)
       end
     end
-    
+
   end
 end
 

@@ -37,28 +37,54 @@ module Platform
   module_function :prompt
 
   def interpreter
-    Config::CONFIG['ruby_install_name']
+    return File.join(RbConfig::CONFIG['bindir'], RbConfig::CONFIG['ruby_install_name']) unless defined?(JRUBY_VERSION)
+    "#{Rails.root}/script/jruby"
   end
   module_function :interpreter
 
-  def create_child_process(project_name, command)
-    if Kernel.respond_to?(:fork)
-      begin
-        pid = fork || safely_exec(command)
+  def gem_cmd
+    "#{Platform.interpreter} -S gem"
+  end
+  module_function :gem_cmd
 
-        # safely exec
-        Process.detach(pid)
-        pid_file = File.join(RAILS_ROOT, 'tmp', 'pids', 'builders', "#{project_name}.pid")
-        FileUtils.mkdir_p(File.dirname(pid_file))
-        File.open(pid_file, "w") {|f| f.write pid }
-      rescue NotImplementedError   # Kernel.fork exists but not implemented in Windows
+  def bundle_cmd
+    "#{Platform.interpreter} -S bundle"
+  end
+  module_function :bundle_cmd
+
+  def create_child_process(project_name, command)
+    Bundler.with_clean_env do
+      if Kernel.respond_to?(:fork)
+        begin
+          pid = fork || safely_exec(command)
+
+          # safely exec
+          Process.detach(pid)
+        rescue NotImplementedError   # Kernel.fork exists but not implemented in Windows
+          Thread.new { system(command) }
+        end
+      else
         Thread.new { system(command) }
       end
-    else
-      Thread.new { system(command) }
     end
   end
   module_function :create_child_process
+
+  def project_pid_file(project_name)
+    Rails.root.join('tmp', 'pids', 'builders', "#{project_name}.pid")
+  end
+  module_function :project_pid_file
+
+  def kill_project_builder(project_name)
+    kill_child_process project_pid_file(project_name).read.chomp
+  end
+  module_function :kill_project_builder
+
+  def kill_child_process(pid)
+    kill_tree = Rails.root.join('script', 'killtree')
+    Kernel.system("#{kill_tree} #{pid}")
+  end
+  module_function :kill_child_process
 
   def safely_exec(command)
     if running_as_daemon?

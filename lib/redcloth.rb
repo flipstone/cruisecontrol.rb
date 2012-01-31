@@ -1127,4 +1127,3 @@ class RedCloth < String
         end
     end
 end
-

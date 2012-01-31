@@ -12,7 +12,7 @@ module SourceControl
 
   class Subversion < AbstractAdapter
 
-    attr_accessor :repository, :username, :password, :check_externals
+    attr_accessor :username, :password, :check_externals
 
     def initialize(options = {})
       options = options.dup
@@ -31,10 +31,10 @@ module SourceControl
       raise "don't know how to handle '#{options.keys.first}'" if options.length > 0
     end
 
-    def checkout(revision = nil, stdout = $stdout)
-      raise 'Repository location is not specified' unless @repository
+    def checkout(revision = nil, stdout = $stdout, checkout_path = path)
+      raise 'Repository location is not specified' unless repository
 
-      arguments = [@repository, path]
+      arguments = [repository, checkout_path]
       arguments << "--username" << @username if @username
       arguments << "--password" << @password if @password
       arguments << "--revision" << revision_number(revision) if revision
@@ -66,7 +66,7 @@ module SourceControl
       latest_revision = self.latest_revision
       if latest_revision > Revision.new(revision_number)
         reasons << "New revision #{latest_revision.number} detected"
-        reasons << revisions_since(revision_number)
+        reasons.concat(revisions_since(revision_number))
         result = false
       end
 
@@ -97,6 +97,13 @@ module SourceControl
     end
 
     def creates_ordered_build_labels?() true end
+
+    def repository
+      # Try to detect repository location if not provided
+      @repository || info.url
+    end
+
+    attr_writer :repository
     
     private
 
@@ -131,9 +138,11 @@ module SourceControl
       revision.respond_to?(:number) ? revision.number : revision.to_i
     end
 
-    Info = Struct.new :revision, :last_changed_revision, :last_changed_author
+    Info = Struct.new :revision, :last_changed_revision, :last_changed_author, :url
 
     class ExternalReasons < Struct.new :external, :reasons
+      delegate :concat, :to => :reasons
+
       def <<(reason)
         if reason.is_a? String
           reasons << "#{reason} in external '#{external}'"

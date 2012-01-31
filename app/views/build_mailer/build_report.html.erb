@@ -3,7 +3,7 @@
 
 CHANGES
 -------
-<%= @build.changeset %>
+<%= raw @build.changeset %>
 
 <% unless @failures_and_errors.empty? -%>
 TEST FAILURES AND ERRORS
@@ -15,17 +15,22 @@ See <%= "#{@build.url}" %> for details.
 <% else -%>
 <%= @message %>
 
-  Note: if you set Configuration.dashboard_url in config/site_config.rb, you'd see a link to the build page here.
+  Note: if you set Configuration.dashboard_url in site_config.rb, you'd see a link to the build page here.
 
 CHANGES
 -------
-<%= @build.changeset %>
+<%= raw @build.changeset %>
 
 BUILD LOG
 ---------
-<%= @build.output %>
+<% if @build.output_exceeds_max_file_display_length? %>
+The output below has been truncated to <%= number_to_human_size(Configuration.max_file_display_length) %>.
+View <%= link_to "the full log", build_artifact_path(:project => @build.project.name, :build => @build.label, :path => 'build.log') %> for the rest.
+<% end %>
+
+<%= raw @build.output %>
 
 PROJECT SETTINGS
 ----------------
-<%= @build.project_settings %>
+<%= raw @build.project_settings %>
 <% end -%>

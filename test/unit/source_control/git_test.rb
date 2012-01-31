@@ -1,7 +1,6 @@
-require File.dirname(__FILE__) + '/../../test_helper'
-require 'stringio'
+require 'test_helper'
 
-class SourceControl::GitTest < Test::Unit::TestCase
+class SourceControl::GitTest < ActiveSupport::TestCase
 
   include FileSandbox
   include SourceControl
@@ -42,7 +41,7 @@ class SourceControl::GitTest < Test::Unit::TestCase
 
       reasons = []
       assert_false git.up_to_date?(reasons)
-      assert_equal [[:new_revision]], reasons
+      assert_equal [:new_revision], reasons
     end
   end
 
@@ -73,6 +72,7 @@ class SourceControl::GitTest < Test::Unit::TestCase
     in_sandbox do
       git = new_git(:repository => "git:/my_repo", :branch => "mybranch")
       git.expects(:git).with("clone", ["git:/my_repo", '.'], :execute_in_project_directory => false)
+      git.stubs(:current_branch).returns('master')
       git.expects(:git).with("branch", ["--track", 'mybranch', 'origin/mybranch'])
       git.expects(:git).with("checkout", ["-q", 'mybranch'])
       git.checkout
@@ -83,7 +83,37 @@ class SourceControl::GitTest < Test::Unit::TestCase
     in_sandbox do
       git = new_git(:repository => "git:/my_repo", :branch => "master")
       git.expects(:git).with("clone", ["git:/my_repo", '.'], :execute_in_project_directory => false)
+      git.stubs(:current_branch).returns('master')
       git.checkout
+    end
+  end
+
+  def test_checkout_with_master_branch_explicitly_specified_when_master_is_not_default_should_perform_git_branch_and_checkout
+    in_sandbox do
+      git = new_git(:repository => "git:/my_repo", :branch => "master")
+      git.expects(:git).with("clone", ["git:/my_repo", '.'], :execute_in_project_directory => false)
+      git.stubs(:current_branch).returns('mybranch')
+      git.expects(:git).with("branch", ["--track", 'master', 'origin/master'])
+      git.expects(:git).with("checkout", ["-q", 'master'])
+      git.checkout
+    end
+  end
+
+  def test_checkout_with_default_branch_explicitly_specified_should_not_perform_git_branch_and_checkout
+    in_sandbox do
+      git = new_git(:repository => "git:/my_repo", :branch => "mybranch")
+      git.expects(:git).with("clone", ["git:/my_repo", '.'], :execute_in_project_directory => false)
+      git.stubs(:current_branch).returns('mybranch')
+      git.checkout
+    end
+  end
+
+  def test_checkout_should_perform_clone_to_a_given_directory
+    in_sandbox do |sandbox|
+      git = new_git(:repository => "git:/my_repo")
+      git.expects(:git).with("clone", ["git:/my_repo", "somewhere"], :execute_in_project_directory => false)
+      FileUtils.mkdir File.join(sandbox.root, "somewhere")
+      git.checkout(nil, $stdout, "somewhere")
     end
   end
 
@@ -93,6 +123,14 @@ class SourceControl::GitTest < Test::Unit::TestCase
       git.expects(:git).never
 
       assert_raise(RuntimeError) { git.checkout }
+    end
+  end
+  
+  def test_clean_checkout_should_perform_git_clean
+    in_sandbox do
+      git = new_git(:repository => "git:/my_repo")
+      git.expects(:git).with("clean", ['-q', '-d', '-f'])
+      git.clean_checkout
     end
   end
 
@@ -116,12 +154,13 @@ class SourceControl::GitTest < Test::Unit::TestCase
       class << git
         def git(*args)
           sleep 1
+          ""
         end
       end
       
       begin
         old_timeout = Configuration.git_load_new_changesets_timeout
-        Configuration.git_load_new_changesets_timeout = 0.5
+        Configuration.git_load_new_changesets_timeout = 0.5.seconds
 
         assert_raise(BuilderError) do
           begin

@@ -14,18 +14,11 @@ class BuildsController < ApplicationController
       render :action => 'no_builds_yet' and return if @build.nil?
     end
 
-    @builds_for_navigation_list = @project.builds.reverse[0, 30]
+    @builds_for_navigation_list, @builds_for_dropdown = partitioned_build_lists(@project)
 
     @autorefresh = @build.incomplete?
   end
 
-  def drop_down
-    render :text => 'Project not specified', :status => 404 and return unless params[:project]
-    @project = Project.find(params[:project])
-    @builds_for_dropdown = @project.builds.reverse[30..-1]
-    render :layout => false
-  end
-  
   def artifact
     render :text => 'Project not specified', :status => 404 and return unless params[:project]
     render :text => 'Build not specified', :status => 404 and return unless params[:build]
@@ -37,41 +30,55 @@ class BuildsController < ApplicationController
     render :text => "Build #{params[:build].inspect} not found", :status => 404 and return unless @build
 
     path = @build.artifact(params[:path])
-
+    
     if File.directory? path
       if File.exists?(File.join(path, 'index.html'))
-        redirect_to request.request_uri + '/index.html'
+        redirect_to request.fullpath + '/index.html'
       else
-        # TODO: generate an index from directory contents
-        render :text => "this should be an index of #{params[:path]}"
+        render :template => 'builds/show_dir_index'
       end
     elsif File.exists? path
-      send_file(path, :type => get_mime_type(path), :disposition => 'inline', :stream => false)
+      disposition = params.has_key?("attachment") ? "attachment" : "inline"
+      send_file(path, :type => get_mime_type(path), :disposition => disposition, :stream => false)
     else
       render_not_found
     end
   end
-  
-  private
-  def get_mime_type(name)
-    case name.downcase
-    when /\.html$/
-      'text/html'
-    when /\.js$/
-      'text/javascript'
-    when /\.css$/
-      'text/css'
-    when /\.gif$/
-      'image/gif'
-    when /(\.jpg|\.jpeg)$/
-      'image/jpeg'
-    when /\.png$/
-      'image/png'
-    when /\.zip$/
-      'application/zip'
-    else
-      'text/plain'
-    end
+
+  def latest_successful
+    render :text => 'Project not specified', :status => 404 and return unless params[:project]
+
+    @project = Project.find(params[:project])
+    render :text => "Project #{params[:project].inspect} not found", :status => 404 and return unless @project
+    @build = @project.builds.find_all(&:successful?).last
+    render :text => "No successful build found", :status => 404 and return unless @build
+
+    redirect_to build_path(@project, @build) +
+                (params[:path] ? "/#{params[:path]}" : "")
   end
+
+  private
+
+    MIME_TYPES = {
+      "html" => "text/html",
+      "js"   => "text/javascript",
+      "css"  => "text/css",
+      "gif"  => "image/gif",
+      "jpg"  => "image/jpeg",
+      "jpeg" => "image/jpeg",
+      "png"  => "image/png",
+      "zip"  => "application/zip"
+    }
+
+    def get_mime_type(name)
+      Rack::Mime::MIME_TYPES[File.extname(name)] || "text/plain"
+    end
+
+    def partitioned_build_lists(project)
+      builds = project.builds.reverse
+      partition_point = Configuration.build_history_limit
+
+      return builds[0...partition_point], builds[partition_point..-1] || []
+    end
 
 end

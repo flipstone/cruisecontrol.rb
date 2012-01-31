@@ -12,13 +12,13 @@ module SourceControl
       raise "don't know how to handle '#{options.keys.first}'" if options.length > 0
     end
 
-    def checkout(revision = nil, stdout = $stdout)
+    def checkout(revision = nil, stdout = $stdout, checkout_path = path)
       raise 'Repository location is not specified' unless @repository
 
-      raise "#{path} is not empty, cannot branch a project into it" unless (Dir.entries(path) - ['.', '..']).empty?
-      FileUtils.rm_rf(path)
+      raise "#{checkout_path} is not empty, cannot branch a project into it" unless (Dir.entries(checkout_path) - ['.', '..']).empty?
+      FileUtils.rm_rf(checkout_path)
 
-      args = [@repository, path]
+      args = [@repository, checkout_path]
       args << ['-r', revision.number] if revision
       bzr('branch', args, :execute_in_project_directory => false)
     end
@@ -37,11 +37,11 @@ module SourceControl
       if bzr_remote == bzr_local
         return true
       elsif bzr_local > bzr_remote
-        raise "Local repository is bigger that should be impossible"
+        raise "Local repository is bigger, which should be impossible!"
       else
         bzr_output = bzr('missing', ['-v'], :exitstatus => 1)
         _new_revisions = Bazaar::LogParser.new.parse(bzr_output)
-        reasons << _new_revisions
+        reasons.concat(_new_revisions)
         return false
       end
     end

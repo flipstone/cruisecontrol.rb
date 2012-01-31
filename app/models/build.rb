@@ -32,13 +32,17 @@ class Build
   end
   
   def run
-    build_log = artifact 'build.log'
-    File.open(artifact('cruise_config.rb'), 'w') {|f| f << @project.config_file_content }
+    build_log = artifact('build.log')
+    build_log_path = build_log.expand_path.to_s
+    artifact('cruise_config.rb').open('w') {|f| f << @project.config_file_content }
 
     begin
       raise ConfigError.new(@project.error_message) unless @project.config_valid?
       in_clean_environment_on_local_copy do
-        execute self.command, :stdout => build_log, :stderr => build_log
+        if @project.uses_bundler?
+          execute self.bundle_install, :stdout => build_log_path, :stderr => build_log_path, :env => project.environment
+        end
+        execute self.command, :stdout => build_log_path, :stderr => build_log_path, :env => project.environment
       end
       build_status.succeed!(seconds_since(@start))
     rescue => e
@@ -53,10 +57,11 @@ Try to remove this project, then re-add it with correct APP_ROOT, e.g.
 rm -rf #{project.path}
 ./cruise add #{project.name} svn://my.svn.com/#{project.name}/trunk
 EOF
-        File.open(build_log, 'a'){|f| f << msg }
+        build_log.open('a') { |f| f << msg }
       end
 
-      File.open(build_log, 'a'){|f| f << e.message }
+      build_log.open('a') { |f| f << e.message }
+
       CruiseControl::Log.verbose? ? CruiseControl::Log.debug(e) : CruiseControl::Log.info(e.message)
       if e.is_a?(CommandLine::ExecutionError) # i.e., the build returned a non-zero status code
         fail!
@@ -105,8 +110,12 @@ EOF
     @changeset ||= contents_for_display(artifact('changeset.log'))
   end
 
+  def build_log
+    artifact('build.log')
+  end
+
   def output
-    @output ||= contents_for_display(artifact('build.log'))
+    @output ||= contents_for_display(build_log)
   end
   
   def project_settings
@@ -125,35 +134,40 @@ EOF
     build_status.timestamp
   end
 
+  def files_in(path)
+    Dir["#{artifacts_directory}/#{path}/*"].collect {|f| f.gsub("#{artifacts_directory}/", '') }
+  end
+  
   def artifacts_directory
     Dir["#{@project.path}/build-#{label}*"].sort.first || File.join(@project.path, "build-#{label}")
   end
   
   def clear_cache
-    FileUtils.rm_f "#{RAILS_ROOT}/public/builds/older/#{@project.name}.html"
+    FileUtils.rm_f Rails.root.join(Rails.root, 'public', 'builds', 'older', "#{@project.name}.html")
   end
   
   def url
     dashboard_url = Configuration.dashboard_url
     raise "Configuration.dashboard_url is not specified" if dashboard_url.nil? || dashboard_url.empty?
-    dashboard_url + ActionController::Routing::Routes.generate(
-        :controller => 'builds', :action => 'show', :project => project, :build => to_param)
+    dashboard_url + Rails.application.routes.url_helpers.build_path(:project => project, :build => to_param)
   end
   
   def artifact(path)
-    File.join(artifacts_directory, path)
+    Pathname.new(artifacts_directory).join(path)
+  end
+
+  def exceeds_max_file_display_length?(file)
+    file.exist? && Configuration.max_file_display_length.present? && file.size > Configuration.max_file_display_length
+  end
+
+  def output_exceeds_max_file_display_length?
+    exceeds_max_file_display_length?(artifact('build.log'))
   end
 
   def contents_for_display(file)
-    return '' unless File.file?(file) && File.readable?(file)
-    file_size_kbytes = File.size(file) / 1024
-    if file_size_kbytes < 100
-      File.read(file)
-    else
-      contents = File.read(file, 100 * 1024)
-      response = "#{file} is #{file_size_kbytes} kbytes - too big to display in the dashboard, the output is truncated\n\n\n"
-      response += contents
-    end
+    return '' unless file.file? && file.readable?
+
+    file.read(Configuration.max_file_display_length)
   end
 
   def command
@@ -163,35 +177,57 @@ EOF
   def rake_task
     project.rake_task
   end
-  
-  def rake
-    # Simply calling rake is this convoluted due to idiosyncrazies of Windows, Debian and JRuby. :(
-    # ABSOLUTE_RAILS_ROOT is set in config/envirolnment.rb, and is necessary because
-    # in_clean_environment__with_local_copy() changes current working directory. Replacing it with RAILS_ROOT doesn't
-    # fail any tests, because in test environment (unlike production) RAILS_ROOT is already absolute. 
-    # --nosearch flag here prevents CC.rb from building itself when a project has no Rakefile
-    # ARGV.clear at the end prevents Test::Unit's AutoRunner from doing anything silly, like trying to require 'cc:rb'
-    # Some people saw it happening.
-    %{#{Platform.interpreter} -e "require 'rubygems' rescue nil; require 'rake'; load '#{ABSOLUTE_RAILS_ROOT}/tasks/cc_build.rake'; ARGV << '--nosearch'#{CruiseControl::Log.verbose? ? " << '--trace'" : ""} << 'cc:build'; Rake.application.run; ARGV.clear"}
+
+  def bundle_install
+    [ 
+      bundle("check", "--gemfile=#{project.gemfile}"),
+      bundle("install", project.bundler_args)
+    ].join(" || ")
   end
 
+  def rake
+    # Simply calling rake is this convoluted due to idiosyncrasies of Windows, Debian and JRuby.
+    # --nosearch flag here prevents CC.rb from building itself when a project has no Rakefile.
+    # ARGV.clear at the end prevents Test::Unit's AutoRunner from doing anything silly.
+    cc_build_path = Rails.root.join('tasks', 'cc_build.rake')
+    maybe_trace   = CruiseControl::Log.verbose? ? " << '--trace'" : ""
+    
+    if project.uses_bundler?
+      %{BUNDLE_GEMFILE=#{project.gemfile} #{Platform.bundle_cmd} exec rake -e "load '#{cc_build_path}'; ARGV << '--nosearch'#{maybe_trace} << 'cc:build'; Rake.application.run; ARGV.clear"}
+    else  
+      %{#{Platform.interpreter} -e "require 'rubygems' rescue nil; require 'rake'; load '#{cc_build_path}'; ARGV << '--nosearch'#{maybe_trace} << 'cc:build'; Rake.application.run; ARGV.clear"}
+    end
+  end
+  
   def in_clean_environment_on_local_copy(&block)
     old_rails_env = ENV['RAILS_ENV']
-    ENV['RAILS_ENV'] = nil
+    old_bundle_gemfile = ENV['BUNDLE_GEMFILE']
+    old_rails_context_path = ENV['RAILS_RELATIVE_URL_ROOT']
 
-    # set OS variable CC_BUILD_ARTIFACTS so that custom build tasks know where to redirect their products
-    ENV['CC_BUILD_ARTIFACTS'] = self.artifacts_directory
-    # set OS variablea CC_BUILD_LABEL & CC_BUILD_REVISION so that custom build tasks can use them
-    ENV['CC_BUILD_LABEL'] = self.label
-    ENV['CC_BUILD_REVISION'] = self.revision
-    # CC_RAKE_TASK communicates to cc:build which task to build (if self.rake_task is not set, cc:build will try to be
-    # smart about it)
-    ENV['CC_RAKE_TASK'] = self.rake_task
-    Dir.chdir(project.local_checkout) do
-      block.call
+    Bundler.with_clean_env do
+      begin
+        ENV['RAILS_ENV'] = nil
+        ENV['BUNDLE_GEMFILE'] = nil
+        ENV['RAILS_RELATIVE_URL_ROOT'] = nil
+
+        # set OS variable CC_BUILD_ARTIFACTS so that custom build tasks know where to redirect their products
+        ENV['CC_BUILD_ARTIFACTS'] = self.artifacts_directory
+        # set OS variablea CC_BUILD_LABEL & CC_BUILD_REVISION so that custom build tasks can use them
+        ENV['CC_BUILD_LABEL'] = self.label
+        ENV['CC_BUILD_REVISION'] = self.revision
+        # CC_RAKE_TASK communicates to cc:build which task to build (if self.rake_task is not set, cc:build will try to be
+        # smart about it)
+        ENV['CC_RAKE_TASK'] = self.rake_task
+
+        Dir.chdir(project.local_checkout) do
+          block.call
+        end
+      ensure
+        ENV['RAILS_ENV'] = old_rails_env
+        ENV['BUNDLE_GEMFILE'] = old_bundle_gemfile
+        ENV['RAILS_RELATIVE_URL_ROOT'] = old_rails_context_path
+      end
     end
-  ensure
-    ENV['RAILS_ENV'] = old_rails_env
   end
 
   def to_param
@@ -214,5 +250,11 @@ EOF
     revision, rebuild_number = label.split('.')
     [revision[0..6], rebuild_number].compact.join('.')
   end
+
+  private
+    
+    def bundle(*args)
+      ( [ "BUNDLE_GEMFILE=#{project.gemfile}", Platform.bundle_cmd ] + args.flatten ).join(" ")
+    end
 
 end

@@ -15,25 +15,27 @@ module SourceControl
       raise "don't know how to handle '#{options.keys.first}'" if options.length > 0
     end
 
-    def checkout(revision = nil, stdout = $stdout)
+    def checkout(revision = nil, stdout = $stdout, checkout_path = path)
       raise 'Repository location is not specified' unless @repository
 
-      raise "#{path} is not empty, cannot clone a project into it" unless (Dir.entries(path) - ['.', '..']).empty?
-      FileUtils.rm_rf(path)
+      raise "#{checkout_path} is not empty, cannot clone a project into it" unless (Dir.entries(checkout_path) - ['.', '..']).empty?
+      FileUtils.rm_rf(checkout_path)
 
       # need to read from command output, because otherwise tests break
-      git('clone', [@repository, path], :execute_in_project_directory => false)
+      git('clone', [@repository, checkout_path], :execute_in_project_directory => false)
 
-      if @branch and @branch != 'master'
+      if @branch and @branch != current_branch
         git('branch', ['--track', @branch, "origin/#{@branch}"])
         git('checkout', ['-q', @branch]) # git prints 'Switched to branch "branch"' to stderr unless you pass -q 
       end
       git("reset", ['--hard', revision.number]) if revision
     end
 
-    # TODO implement clean_checkout as "git clean -d" - much faster
     def clean_checkout(revision = nil, stdout = $stdout)
-      super(revision, stdout)
+      # (-f) Forcing the clean incase git clean.requireForce is set to true
+      # (-d) Directory clean
+      # (-q) Quiet, prevent git from writing unnecessary information to stdout/stderr 
+      git('clean', ['-q', '-d', '-f'])
     end
 
     def latest_revision
@@ -56,7 +58,7 @@ module SourceControl
       if _new_revisions.empty?
         return true
       else
-        reasons.concat _new_revisions
+        reasons.concat(_new_revisions)
         return false
       end
     end
@@ -96,7 +98,8 @@ module SourceControl
     def load_new_changesets_from_origin
       # NOTE: Git network problems may cause CruiseControl.rb to hang unless you install the system_timer gem.
       # See: https://cruisecontrolrb.lighthouseapp.com/projects/9150-cruise-control-rb/tickets/229-sometimes-git-hangs
-      MyTimer.timeout(Configuration.git_load_new_changesets_timeout) do
+      
+      MyTimer.timeout(Configuration.git_load_new_changesets_timeout.to_f) do
         git("fetch", ["origin"])
       end
     rescue Timeout::Error => e

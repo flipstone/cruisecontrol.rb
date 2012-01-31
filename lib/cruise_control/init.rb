@@ -29,6 +29,8 @@ module CruiseControl
     end
   
     def start
+      require ENV_PATH
+
       unless ARGV.include?('-p') || ARGV.include?('--port')
         ARGV << '-p'
         ARGV << DEFAULT_PORT.to_s
@@ -38,20 +40,51 @@ module CruiseControl
         ARGV << '-e'
         ARGV << 'production'
       end
+
+      unless ARGV.include?('-c') || ARGV.include?('--config')
+        ARGV << '-c'
+        ARGV << Rails.root.join('config.ru').to_s
+      end
+
+      unless ARGV.include?('-P') || ARGV.include?('--pid')
+        ARGV << '-P'
+        ARGV << Rails.root.join('tmp', 'pids', 'server.pid').to_s
+      end
       
       require File.join(File.dirname(__FILE__), '..', 'platform')
       Platform.running_as_daemon = ARGV.include?('-d') || ARGV.include?('--daemon')
-      load File.join(File.dirname(__FILE__), '..', '..', 'script', 'server')
+      require 'rails/commands/server'
+      
+      Rails::Server.new.tap { |server|
+        Dir.chdir(Rails.application.root)
+        server.start
+      }
     end
 
     def stop
-      pid_file = File.join("tmp", "pids", "server.pid")
-      if File.exist?(pid_file)
-        exec "mongrel_rails stop -P #{pid_file}"
+      require ENV_PATH
+
+      stop_builders
+      stop_server
+    end
+
+    def stop_server
+      pid_file = Rails.root.join("tmp", "pids", "server.pid")
+
+      if pid_file.exist?
+        exec "kill -KILL #{pid_file.read.chomp}"
+        pid_file.delete
+      end
+    end
+
+    def stop_builders
+      Rails.root.join("tmp", "pids", "builders").children.each do |pid_file|
+        Platform.kill_child_process(pid_file.read.chomp)
       end
     end
 
     def add
+      require ENV_PATH
       load File.join(File.dirname(__FILE__), '..', '..', 'script', 'add_project')
     end
 
@@ -62,7 +95,7 @@ module CruiseControl
     def version
       puts <<-EOL
     CruiseControl.rb, version #{CruiseControl::VERSION::STRING}
-    Copyright (C) 2009 ThoughtWorks
+    Copyright (C) 2011 ThoughtWorks
       EOL
     end
   
@@ -72,19 +105,20 @@ module CruiseControl
       ARGV.clear << '--help'
       if command.nil?
         puts <<-EOL
-    Usage: cruise <command> [options] [args]
+Usage: cruise <command> [options] [args]
 
-    CruiseControl.rb command-line client, version #{CruiseControl::VERSION::STRING}
-    Type 'cruise help <command>' for help on a specific command.
-    Type 'cruise --version' to see the version number.
+CruiseControl.rb command-line client, version #{CruiseControl::VERSION::STRING}
+Type 'cruise help <command>' for help on a specific command.
+Type 'cruise --version' to see the version number.
 
-    Available commands:
-      start      - starts the web server (port 3333, production environment by default)
-      add        - adds a project
-      build      - starts the builder for an individual project
+Available commands:
+  start      - starts the web server (port 3333, production environment by default)
+  stop       - stops the web server
+  add        - adds a project
+  build      - starts the builder for an individual project
 
-    CruiseControl.rb is a Continous Integration Server.
-    For additional information, see http://cruisecontrolrb.thoughtworks.com/
+CruiseControl.rb is a Continous Integration Server.
+For additional information, see http://cruisecontrolrb.thoughtworks.com/
         EOL
       elsif method_for_command(command)
         self.send(method_for_command(command))

@@ -1,4 +1,4 @@
-require File.dirname(__FILE__) + '/../../test_helper'
+require 'test_helper'
 
 module SourceControl
   class MercurialTest < Test::Unit::TestCase
@@ -53,6 +53,15 @@ module SourceControl
         mercurial_with_checkout_data.expects(:hg).with(
             'clone', ['/tmp/hg_repo', '.'], :execute_in_project_directory => false)
         assert_nothing_raised { mercurial_with_checkout_data.checkout }
+      end
+    end
+
+    def test_checkout_to_a_given_directory
+      hg = Mercurial.new(:repository => '/tmp/hg_repo') 
+      in_sandbox do |sandbox|
+        hg.expects(:hg).with('clone', ['/tmp/hg_repo', 'somewhere'], :execute_in_project_directory => false)
+        FileUtils.mkdir File.join(sandbox.root, "somewhere")
+        assert_nothing_raised { hg.checkout(nil, $stdout, "somewhere") }
       end
     end
 

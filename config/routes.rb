@@ -1,23 +1,29 @@
-ActionController::Routing::Routes.draw do |map|
-  map.root :controller => 'projects', :action => 'index'
+CruiseControl::Application.routes.draw do
+  match '/' => 'projects#index', :as => :root
+  match 'projects/code/:id/*path' => 'projects#code', :as => :code
   
-  map.resources :projects, :member => { :build => :post }
+  resources :projects do
+    member do
+      post :build, :constraints => { :id => /.*/ }
+      post :kill_build, :constraints => { :id => /.*/ }
+      get :getting_started, :constraints => { :id => /.*/ }
+    end
+  end
+
+  match 'builds/:project/latest_successful(/*path)' => 'builds#latest_successful', :as => :latest_successful_build, :project => /[^\/]+/
+  match 'builds/:project/:build/artifacts/*path' => 'builds#artifact', :as => :build_artifact, :build => /[^\/]+/, :project => /[^\/]+/
+  match 'builds/:project/:build' => 'builds#show', :as => :build, :build => /[^\/]+/, :project => /[^\/]+/
+  match 'builds/:project' => 'builds#show', :as => :project_without_builds, :project => /[^\/]+/
+
+  match 'documentation/plugins' => 'documentation#plugins', :as => :plugin_doc_list
+  match 'documentation/plugins/:type/:name' => 'documentation#plugins', :as => :plugin_doc, :name => /[^\/]+/
+
+  match 'documentation/*path' => 'documentation#get', :as => :document
+  match 'documentation' => 'documentation#get', :as => :document_root
   
-  map.builds_drop_down 'builds/older/:project', :controller => 'builds', :action => 'drop_down'
-  map.project_without_builds 'builds/:project', :controller => 'builds', :action => 'show'
-  map.build 'builds/:project/:build', :controller => 'builds', :action => 'show', :build => /[^\/]+/
-  
-  map.build_artifact 'builds/:project/:build/*path', :controller => 'builds', :action => 'artifact', :build => /[^\/]+/
-  map.code 'projects/code/:id/*path', :controller => 'projects', :action => 'code'
-  
-  map.plugin_doc_list 'documentation/plugins', :controller => 'documentation', :action => 'plugins'
-  map.plugin_doc 'documentation/plugins/:type/:name', :controller => 'documentation', :action => 'plugins', :name => /[^\/]+/
-  map.document 'documentation/*path', :controller => 'documentation', :action => 'get'
-  
-  # Install the default route as the lowest priority.
-  map.connect ':controller/:action/:id'
-  
-  # Route for CCTray.NET
-  map.connect 'XmlStatusReport.aspx', :controller => 'projects', :action => 'index', :format => 'cctray'
-  map.connect 'XmlServerReport.aspx', :controller => 'projects', :action => 'index', :format => 'cctray'
+  match 'XmlStatusReport.aspx' => 'projects#index', :format => 'cctray'
+  match 'XmlServerReport.aspx' => 'projects#index', :format => 'cctray'
+
+  # TODO Remove this.
+  match '/:controller(/:action(/:id))'
 end

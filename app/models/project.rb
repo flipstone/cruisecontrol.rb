@@ -2,20 +2,22 @@
 # each time a build is triggered and yielded back to be configured by cruise_config.rb.
 class Project
   attr_reader :name, :plugins, :build_command, :rake_task, :config_tracker, :path, :settings, :config_file_content, :error_message
-  attr_accessor :source_control, :scheduler
+  attr_accessor :source_control, :scheduler, :use_bundler, :gemfile, :bundler_args
+
+  alias_method :id, :name
   
   class << self
     attr_accessor_with_default :plugin_names, []
     attr_accessor :current_project
     
-    def all(dir=CRUISE_DATA_ROOT + "/projects")
+    def all(dir=Configuration.projects_root)
       load_all(dir).map do |project_dir|
         load_project project_dir
       end
     end
     
-    def create(project_name, scm, dir=CRUISE_DATA_ROOT + "/projects")
-      returning(Project.new(project_name, scm)) do |project|
+    def create(project_name, scm, dir=Configuration.projects_root)
+      Project.new(:name => project_name, :scm => scm).tap do |project|
         raise "Project named #{project.name.inspect} already exists in #{dir}" if Project.all(dir).include?(project)
         begin
           save_project(project, dir)
@@ -29,11 +31,11 @@ class Project
     end
     
     def plugin(plugin_name)
-      self.plugin_names << plugin_name unless RAILS_ENV == 'test' or self.plugin_names.include? plugin_name
+      self.plugin_names << plugin_name unless Rails.env == 'test' or self.plugin_names.include? plugin_name
     end
 
     def read(dir, load_config = true)
-      returning Project.new(File.basename(dir)) do |project|
+      Project.new(:name => File.basename(dir)).tap do |project|
         self.current_project = project
         project.load_config if load_config
       end
@@ -46,15 +48,15 @@ class Project
       yield current_project
     end
     
-    def find(project_name)
-      # TODO: sanitize project_name to prevent a query injection attack here
-      path = File.join(CRUISE_DATA_ROOT, 'projects', project_name)
+    def find(project_name, dir=Configuration.projects_root)
+      # TODO: sanitize project_name to prevent a query injection attack here      
+      path = dir.join(project_name)
       return nil unless File.directory?(path)
       load_project(path)
     end
 
     def load_project(dir)
-      returning read(dir, load_config = false) do |project|
+      read(dir, load_config = false).tap do |project|
         project.path = dir
       end
     end
@@ -77,7 +79,7 @@ class Project
       end
 
       def write_config_example(project)
-        config_example = File.join(RAILS_ROOT, 'config', 'cruise_config.rb.example')
+        config_example = Rails.root.join('config', 'cruise_config.rb.example')
         config_in_subversion = File.join(project.path, 'work', 'cruise_config.rb')
         cruise_config = File.join(project.path, 'cruise_config.rb')
         if File.exists?(config_example) and not File.exists?(config_in_subversion)
@@ -86,17 +88,22 @@ class Project
       end
   end
   
-  def initialize(name, scm = nil)
-    @name = name
-    @path = File.join(CRUISE_DATA_ROOT, 'projects', @name)
+  def initialize(attrs = {})
+    attrs = attrs.with_indifferent_access
+
+    @name = attrs[:name] || ""
+    @path = attrs[:path] || Configuration.projects_root.join(@name)
     @scheduler = PollingScheduler.new(self)
     @plugins = []
     @config_tracker = ProjectConfigTracker.new(self.path)
     @settings = ''
     @config_file_content = ''
     @error_message = ''
-    @triggers = [ChangeInSourceControlTrigger.new(self)]
-    self.source_control = scm if scm
+    @triggers = [ ChangeInSourceControlTrigger.new(self) ]
+    @bundler_args = %W(--path=#{self.gem_install_path} --gemfile=#{self.gemfile} --no-color)
+
+    self.source_control = attrs[:scm] if attrs[:scm]
+
     instantiate_plugins
   end
   
@@ -161,7 +168,7 @@ class Project
       raise "Cannot register an plugin with name #{plugin_name.inspect} " +
             "because another plugin, or a method with the same name already exists"
     end
-    self.metaclass.send(:define_method, plugin_name) { plugin }
+    self.singleton_class.send(:define_method, plugin_name) { plugin }
     plugin
   end
 
@@ -195,12 +202,33 @@ class Project
       build_label = build_directory.split("-")[1]
       Build.new(self, build_label)
     end
+
     order_by_label(the_builds)
   end
 
   def builder_state_and_activity
     BuilderStatus.new(self).status
-  end 
+  end
+  
+  def builder_down?
+    BuilderStatus.new(self).builder_down?
+  end
+  
+  def can_build_now?
+    !(building? || builder_down? || Configuration.disable_admin_ui)
+  end
+
+  def can_kill_builder?
+    !Configuration.disable_admin_ui
+  end
+  
+  def building?
+    self.builder_state_and_activity == 'building'
+  end
+  
+  def sleeping?
+    !builder_down? && self.builder_state_and_activity == 'sleeping'
+  end
   
   def builder_error_message
     BuilderStatus.new(self).error_message
@@ -260,7 +288,7 @@ class Project
   end
   
   def last_builds(n)
-    result = builds.reverse[0..(n-1)]
+    builds.reverse[0..(n-1)]
   end
 
   def build_if_necessary
@@ -342,7 +370,11 @@ class Project
       source_control.update(revision)
     end
   end
-  
+
+  def kill_build
+    Platform.kill_project_builder(self.name)
+  end
+
   def build(revision = source_control.latest_revision, reasons = [])
     if Configuration.serialize_builds
       BuildSerializer.serialize(self) { build_without_serialization(revision, reasons) }
@@ -491,7 +523,23 @@ class Project
   def triggered_by=(triggers)
     @triggers = [triggers].flatten
   end
-  
+
+  def uses_bundler?
+    @use_bundler != false && File.exist?(self.gemfile)
+  end
+
+  def gem_install_path
+    File.join(self.local_checkout, "vendor")
+  end
+
+  def gemfile
+    File.join(self.local_checkout, @gemfile || "Gemfile")
+  end
+
+  def environment
+    @environment ||= {}
+  end
+
   private
   
   # sorts a array of builds in order of revision number and rebuild number 

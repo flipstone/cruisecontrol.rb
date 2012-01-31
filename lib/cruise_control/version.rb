@@ -1,11 +1,12 @@
 module CruiseControl
   module VERSION #:nodoc:
     unless defined? MAJOR
-      MAJOR = 1 
-      MINOR = 4
+      MAJOR = 2
+      MINOR = 0
       MAINTENANCE = 0
+      SPECIAL = "pre1"
 
-      STRING = [MAJOR, MINOR, MAINTENANCE].join('.')
+      STRING = [MAJOR, MINOR, MAINTENANCE].join('.') + SPECIAL
     end
   end
 end

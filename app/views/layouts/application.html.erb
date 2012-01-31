@@ -3,12 +3,12 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head>
   <title>CruiseControl.rb<%= @title ? " - " + @title : '' %></title>
-  <%= stylesheet_link_tag 'cruisecontrol', :media => 'all' %>
-  <%= stylesheet_link_tag 'site', :media => 'all' if File.exists?(RAILS_ROOT + "/public/stylesheets/site.css") %>
+  <%= tag :link, :rel => "stylesheet/less", :type => "text/css", :href => path_to_stylesheet('cruisecontrol.less') %>
+  <%= stylesheet_link_tag 'site', :media => 'all' if Rails.root.join("public", "stylesheets", "site.css").exist? %>
   
 
   <% if @autorefresh %>
-    <meta http-equiv="refresh" content="5">
+    <meta http-equiv="refresh" content="<%= Configuration.dashboard_refresh_interval.to_i %>">
     <meta http-equiv="cache-control" content="no-cache">
   <% end %>
   <% if @rss_feeds -%>
@@ -16,7 +16,9 @@
       <%= auto_discovery_link_tag :rss, url_path(url), {:title => title} %>
     <% end -%>
   <% end -%>
-  <%= javascript_include_tag :defaults %>
+  <%= javascript_include_tag "jquery-1.6.1" %>
+  <%= javascript_include_tag "less-1.1.0" %>
+  <%= javascript_include_tag "application" %>
 </head>
 
 <body>

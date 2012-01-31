@@ -1,6 +1,6 @@
-require File.expand_path(File.dirname(__FILE__) + '/../test_helper')
+require 'test_helper'
 
-class ProjectsMigrationTest < Test::Unit::TestCase                                     
+class ProjectsMigrationTest < ActiveSupport::TestCase
   include FileSandbox
 
   def setup
@@ -15,7 +15,7 @@ class ProjectsMigrationTest < Test::Unit::TestCase
   def test_migrate_data_if_needed
     sandbox.new :file => 'data.version', :with_content => '2'
     @migration.expects(:migration_scripts).returns(['001_foo.rb', '002_bar.rb', '003_baz.rb'])
-    @migration.expects(:execute).with("ruby #{expected_script_path('003_baz.rb')} #{@sandbox.root}")
+    @migration.expects(:execute).with("#{Platform.interpreter} #{expected_script_path('003_baz.rb')} #{@sandbox.root}")
 
     @migration.migrate_data_if_needed
   end
@@ -42,8 +42,8 @@ class ProjectsMigrationTest < Test::Unit::TestCase
 
     @migration.expects(:migration_scripts).returns(['001_foo.rb', '002_bar.rb', '003_baz.rb'])
 
-    @migration.expects(:execute).with("ruby #{expected_script_path('002_bar.rb')} #{@sandbox.root}")
-    @migration.expects(:execute).with("ruby #{expected_script_path('003_baz.rb')} #{@sandbox.root}").raises(StandardError.new)
+    @migration.expects(:execute).with("#{Platform.interpreter} #{expected_script_path('002_bar.rb')} #{@sandbox.root}")
+    @migration.expects(:execute).with("#{Platform.interpreter} #{expected_script_path('003_baz.rb')} #{@sandbox.root}").raises(StandardError.new)
 
     assert_raise(StandardError) { @migration.migrate_data_if_needed }
 
@@ -57,9 +57,9 @@ class ProjectsMigrationTest < Test::Unit::TestCase
     assert_false File.exists?("#{projects_dir}/data.version")
 
     @migration.expects(:migration_scripts).returns(['001_foo.rb', '002_bar.rb', '003_baz.rb'])
-    @migration.expects(:execute).with("ruby #{expected_script_path('001_foo.rb')} #{projects_dir}")
-    @migration.expects(:execute).with("ruby #{expected_script_path('002_bar.rb')} #{projects_dir}")
-    @migration.expects(:execute).with("ruby #{expected_script_path('003_baz.rb')} #{projects_dir}")
+    @migration.expects(:execute).with("#{Platform.interpreter} #{expected_script_path('001_foo.rb')} #{projects_dir}")
+    @migration.expects(:execute).with("#{Platform.interpreter} #{expected_script_path('002_bar.rb')} #{projects_dir}")
+    @migration.expects(:execute).with("#{Platform.interpreter} #{expected_script_path('003_baz.rb')} #{projects_dir}")
 
     @migration.migrate_data_if_needed
 
@@ -79,14 +79,14 @@ class ProjectsMigrationTest < Test::Unit::TestCase
 
     @migration.expects(:execute).with() do |*command|
       next_script = migration_scripts.shift
-      expected_command = "ruby #{expected_script_path(next_script)} #{@sandbox.root}"
+      expected_command = "#{Platform.interpreter} #{expected_script_path(next_script)} #{@sandbox.root}"
       assert_equal expected_command, command.first
       true
     end.times(migration_scripts.length)
   end
 
   def expected_script_path(script_name)
-    File.join(RAILS_ROOT, 'db', 'migrate', script_name)
+    Rails.root.join('db', 'migrate', script_name)
   end
 
 end
