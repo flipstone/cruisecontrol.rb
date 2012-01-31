@@ -24,15 +24,11 @@ Gem::Specification.new do |s|
     [ "rake", "0.8.7" ],
     [ "jquery-rails", '1.0.9' ],
     [ "abstract", "1.0.0" ],
-  ].each do |gem, version|
-    s.add_dependency gem, version
-  end
-
-  [ [ "rcov", '0.9.9' ],
+    [ "rcov", '0.9.9' ],
     [ "mocha", "0.9.12" ],
     [ "rack-test", nil ],
   ].each do |gem, version|
-    s.add_development_dependency gem, version
+    s.add_dependency gem, version
   end
 
   s.bindir = "."
