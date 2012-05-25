@@ -8,8 +8,8 @@ require "flipstone-deployment/capistrano"
 # These should be set by the (environment) task, run first
 #
 # set :rails_env, 'development'
-set :instance, "localhost" 
-set :branch, "master" 
+set :instance, "localhost"
+set :branch, "master"
 set :deployment_safeword, "easypeasy"
 set :rvm_ruby_string, '1.9.2'
 
@@ -19,11 +19,11 @@ set :rvm_ruby_string, '1.9.2'
 desc "Runs any following tasks to production environment"
 task :production do
   set :rails_env, "production"
-  set :instance, "cruise.flipstone.com"
-  set :unicorn_port, 8080
+  set :instance, "nexus.flipstone.com"
+  set :unicorn_port, 8081
   set :nginx_cfg, {
     port: 80,
-    ht_user: "cruise",
+    ht_user: "nexus",
     ht_passwd: "welcome1"
   }
   set_env
@@ -33,9 +33,9 @@ desc "Sets Capistrano environment variables after environment task runs"
 task :set_env do
   role :web,      "#{instance}"
   role :app,      "#{instance}"
-  role :db,       "#{instance}", :primary => true 
+  role :db,       "#{instance}", :primary => true
 
-  set :application, "cruisecontrol.rb"
+  set :application, "cruisecontrol-solarnexus.rb"
   set :deploy_to, "/srv/#{application}"
   set :scm, "git"
   set :local_scm_command, "git"
@@ -44,6 +44,7 @@ task :set_env do
   set :repository, "git://github.com/flipstone/#{application}.git"
   set :use_sudo, false
   set :user, "ubuntu"
+  set(:branch, "solarnexus")
 
   ssh_options[:keys] = ["#{ENV['HOME']}/.ssh/fs-remote.pem"]
   ssh_options[:paranoid] = false
