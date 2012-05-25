@@ -41,10 +41,10 @@ task :set_env do
   set :local_scm_command, "git"
   set :scm_passphrase, ""
   set :deploy_via, :remote_cache
-  set :repository, "git://github.com/flipstone/#{application}.git"
+  set :repository, "git://github.com/flipstone/cruisecontrol.rb.git"
   set :use_sudo, false
   set :user, "ubuntu"
-  set(:branch, "solarnexus")
+  set :branch, "solarnexus"
 
   ssh_options[:keys] = ["#{ENV['HOME']}/.ssh/fs-remote.pem"]
   ssh_options[:paranoid] = false
