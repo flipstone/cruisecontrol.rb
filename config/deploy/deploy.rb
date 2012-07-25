@@ -59,3 +59,12 @@ task :set_env do
   }
 
 end
+
+task :symlink_root do
+  run "test -d ~/.cruise && rm -rf ~/.cruise; echo ok"
+  run "ln -sfT /mnt/big_space/flipstone ~/.cruise"
+end
+
+before 'deploy:start', 'symlink_root'
+before 'deploy:restart', 'symlink_root'
+
